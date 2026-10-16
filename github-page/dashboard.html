@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>These2.0 Dashboard</title>
+  <meta name="description" content="Tableau de bord des thèses FMPM : années, clusters, spécialités, rapporteurs, types d'étude, villes (graphiques matplotlib mis à jour chaque jour).">
+  <link rel="icon" href="assets/icon.png">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="./">These2.0</a>
+    <div class="links">
+      <a href="./">Recherche</a>
+      <a href="dashboard.html" aria-current="page">Dashboard</a>
+    </div>
+  </nav>
+  <main>
+    <h1>Tableau de bord des thèses FMPM</h1>
+    <p class="sub" id="sub">Chargement…</p>
+    <div class="kpis" id="kpis"></div>
+    <nav class="toc" id="toc" aria-label="Sections"></nav>
+    <div id="charts"></div>
+
+    <section class="explorer" id="explorer">
+      <h2>Filtrage dynamique</h2>
+      <div class="controls">
+        <input id="fq" type="search" placeholder="Recherche rapide dans le titre ou l'auteur" aria-label="Recherche rapide">
+        <select id="fcluster" aria-label="Cluster"><option value="">Cluster</option></select>
+        <select id="fspec" aria-label="Spécialité"><option value="">Spécialité</option></select>
+        <select id="fyear" aria-label="Année"><option value="">Année</option></select>
+        <button id="reset" class="btn" type="button">Réinitialiser</button>
+        <button id="csv" class="btn" type="button">Export CSV</button>
+      </div>
+      <p class="meta" id="fmeta" aria-live="polite"></p>
+      <div class="scroll tall">
+        <table>
+          <thead><tr><th>Année</th><th>N°</th><th>Spécialité</th><th>Cluster</th><th>Titre de la thèse</th><th>PDF</th></tr></thead>
+          <tbody id="frows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="sub">
+      Jurys, mots-clés et spécialités viennent du catalogue de la bibliothèque, qui n'a pas encore
+      catalogué la plupart des thèses récentes. Depuis 2024 la spécialité n'y est plus renseignée :
+      elle est alors déduite des thèses précédentes du rapporteur (hachures sur le graphique).
+      Type d'étude et villes sont lus dans le titre : ce sont des estimations.
+    </p>
+  </main>
+  <footer>
+    Graphiques générés avec matplotlib ·
+    <a href="https://wd.fmpm.uca.ma/biblio/theses/Accueil.html">thèses FMPM (site officiel)</a> ·
+    <a href="https://cdim.fmp-usmba.ac.ma/stats/dashboard_theses.php">thèses FMPDF Fès (site officiel)</a>
+  </footer>
+  <script src="assets/dashboard.js"></script>
+</body>
+</html>

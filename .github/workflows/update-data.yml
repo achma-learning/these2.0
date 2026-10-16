@@ -1,0 +1,56 @@
+# Daily refresh: re-reads wd.fmpm.uca.ma (+ lib.fmpm.uca.ma for jury/specialty), redraws the
+# matplotlib dashboard, and commits the result into BOTH sub-projects.
+# The commit then redeploys Vercel (git integration) and pages.yml (workflow_run below).
+name: Update data
+
+on:
+  schedule:
+    - cron: "17 4 * * *" # every day, 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: vercel-page/scripts/requirements.txt
+
+      - run: pip install -r vercel-page/scripts/requirements.txt
+
+      - name: Refresh thesis list
+        run: python vercel-page/scripts/update_theses.py --json vercel-page/json/file.json
+
+      - name: Draw dashboard (vercel-page)
+        run: python vercel-page/scripts/build_charts.py --json vercel-page/json/file.json --out vercel-page/public/stats
+
+      - name: Copy to github-page
+        run: |
+          mkdir -p github-page/data github-page/stats
+          cp vercel-page/json/file.json github-page/data/theses.json
+          rm -f github-page/stats/*
+          cp vercel-page/public/stats/* github-page/stats/
+
+      - name: Commit if something changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vercel-page/json/file.json vercel-page/public/stats github-page/data github-page/stats
+          if git diff --cached --quiet; then
+            echo "No change"
+          else
+            git commit -m "data: daily refresh $(date -u +%F)"
+            git push
+          fi
