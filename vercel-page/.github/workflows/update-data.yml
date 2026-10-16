@@ -1,15 +1,25 @@
 # For the These2.0 repository (this folder = repo root). Inactive while it sits inside
 # achma-learning/these2.0, because GitHub only runs workflows from the repo-root .github/.
 #
-# Daily refresh: re-reads wd.fmpm.uca.ma (+ lib.fmpm.uca.ma for jury/specialty), redraws the
-# matplotlib dashboard (public/stats/), commits. Vercel redeploys on the push by itself.
-# Needed because Vercel's file system is read-only: /api/renew-data cannot write json/file.json there.
+# Weekly check of the official catalogue (wd.fmpm.uca.ma) + library OPAC. update_theses.py rebuilds
+# json/file.json and only rewrites it if the content changed; charts are redrawn only then.
+# json/status.json (last check) is committed every week, which also keeps the schedule alive
+# (GitHub disables schedules after 60 days without repo activity). Vercel redeploys on each push.
+# This replaces /api/renew-data, which can't write on Vercel (read-only file system).
+#
+# Faculty server blocking GitHub's runners? Export the CSV with the FMPM userscript
+# (greasyfork #600588, "Exporter CSV brut") and commit it as json/official-export.csv.
 name: Update data
 
 on:
   schedule:
-    - cron: "17 4 * * *" # every day, 04:17 UTC
+    - cron: "17 4 * * 1" # every Monday, 04:17 UTC
   workflow_dispatch:
+    inputs:
+      redraw_charts:
+        description: "Redraw the charts even if the data did not change"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -26,11 +36,15 @@ jobs:
           cache: pip
           cache-dependency-path: scripts/requirements.txt
       - run: pip install -r scripts/requirements.txt
-      - run: python scripts/update_theses.py
-      - run: python scripts/build_charts.py
-      - name: Commit if something changed
+      - id: data
+        run: python scripts/update_theses.py
+      - if: steps.data.outputs.changed == 'true' || inputs.redraw_charts
+        run: python scripts/build_charts.py
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add json/file.json public/stats
-          git diff --cached --quiet || { git commit -m "data: daily refresh $(date -u +%F)"; git push; }
+          git add json public/stats
+          git diff --cached --quiet && exit 0
+          if [ "${{ steps.data.outputs.changed }}" = "true" ]; then msg="data: official site changed"; else msg="data: weekly check, no change"; fi
+          git commit -m "$msg $(date -u +%F)" && git push

@@ -18,7 +18,11 @@ type These = {
   membreAssocie:  string[] | null;
   profs: string[];
   href: string;
-  categorySource?: "rapporteur" | null; // set by scripts/update_theses.py when the specialty was guessed from the rapporteur
+  // official FMPM specialty (docs/liste-des-specialites-fmpm.pdf), set by scripts/specialites.py
+  specialite?: string; // "Non classée" when unknown
+  groupe?: string; // "Spécialités de médecine" | "Spécialités de chirurgie" | "Spécialités de biologie" | "Non classée"
+  specialiteSource?: "catalogue" | "rapporteur" | "titre"; // rapporteur / titre = automatic guess
+  specialiteConfiance?: number; // 0-1, only for "titre" guesses from the Naive Bayes model
   // cote: string;
 };
 type sort =

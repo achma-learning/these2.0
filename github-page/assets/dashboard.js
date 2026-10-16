@@ -12,18 +12,21 @@
   const table = (head, rows) => `<table><thead><tr>${head.map((h, i) => `<th class="${i ? "n" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${
     rows.map((r) => `<tr>${r.map((c, i) => `<td class="${i && typeof c === "number" ? "n" : ""}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
 
+  // ?v=<version> (hash of the data) makes browsers fetch new PNGs as soon as the data changes,
+  // instead of showing a cached old chart under the same file name.
+  let statusLine = "";
   function renderCharts(s) {
-    $("sub").textContent = `${s.total} thèses · mis à jour ${s.lastFetched} · sources : wd.fmpm.uca.ma (liste officielle) et lib.fmpm.uca.ma (jury, spécialité)`;
+    $("sub").textContent = `${s.total} thèses · données du ${s.lastFetched}${statusLine} · sources : wd.fmpm.uca.ma (liste officielle) et lib.fmpm.uca.ma (jury)`;
     $("kpis").innerHTML = s.kpis.map(([v, l]) => `<div class="kpi"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join("");
     const sections = [...new Set(s.charts.map((c) => c.section))];
     $("toc").innerHTML = sections.map((x) => `<a href="#${slug(x)}">${esc(x)}</a>`).join("") + `<a href="#explorer">Filtrage dynamique</a>`;
     $("charts").innerHTML = sections.map((sec) => `<h2 id="${slug(sec)}">${esc(sec)}</h2>` +
       s.charts.filter((c) => c.section === sec).map((c) => `
         <section class="chart">
-          <a href="stats/${c.id}.png" target="_blank" rel="noopener" title="Ouvrir en grand">
+          <a href="stats/${c.id}.png?v=${s.version}" target="_blank" rel="noopener" title="Ouvrir en grand">
             <picture>
-              <source srcset="stats/${c.id}-dark.png" media="(prefers-color-scheme: dark)">
-              <img src="stats/${c.id}.png" alt="${esc(c.alt)}" loading="lazy">
+              <source srcset="stats/${c.id}-dark.png?v=${s.version}" media="(prefers-color-scheme: dark)">
+              <img src="stats/${c.id}.png?v=${s.version}" alt="${esc(c.alt)}" loading="lazy">
             </picture>
           </a>
           <details><summary>Voir les chiffres</summary><div class="scroll">${table(c.table.head, c.table.rows)}</div></details>
@@ -37,22 +40,22 @@
   }
   function current() {
     const q = norm($("fq").value).split(/\s+/).filter(Boolean);
-    const cl = $("fcluster").value, sp = $("fspec").value, y = $("fyear").value;
-    return ROWS.filter((r) => (!cl || r.cluster === cl) && (!sp || r.spec === sp) && (!y || String(r.year) === y) &&
+    const cl = $("fgroup").value, sp = $("fspec").value, y = $("fyear").value;
+    return ROWS.filter((r) => (!cl || r.group === cl) && (!sp || r.spec === sp) && (!y || String(r.year) === y) &&
       q.every((w) => r.n.includes(w)));
   }
   function renderRows() {
     const rows = current();
     $("fmeta").textContent = `${rows.length} thèse(s)${rows.length > MAX_ROWS ? ` · ${MAX_ROWS} premières affichées, l'export CSV contient tout` : ""}`;
     $("frows").innerHTML = rows.slice(0, MAX_ROWS).map((r) => `<tr>
-      <td>${r.year}</td><td>${r.ord}</td><td>${esc(r.spec)}${r.guess ? " ?" : ""}</td><td>${esc(r.cluster)}</td>
+      <td>${r.year}</td><td>${r.ord}</td><td>${esc(r.spec)}${r.guess ? ` <span title="${esc(r.guess)}">?</span>` : ""}</td><td>${esc(r.group)}</td>
       <td>${esc(r.title)}<br><small>Dr ${esc(r.author)}</small></td>
       <td>${r.href ? `<a href="${esc(r.href)}" target="_blank" rel="noopener">PDF</a>` : ""}</td></tr>`).join("");
   }
   function exportCsv() {
     const q = (v) => (/[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-    const lines = [["Année", "N°", "Auteur", "Titre", "Spécialité", "Spécialité déduite", "Cluster", "Rapporteur", "PDF"].join(",")]
-      .concat(current().map((r) => [r.year, r.ord, r.author, r.title, r.spec, r.guess ? "oui" : "", r.cluster, r.rapporteur, r.href].map(q).join(",")));
+    const lines = [["Année", "N°", "Auteur", "Titre", "Spécialité (liste officielle)", "Source de la spécialité", "Groupe", "Rapporteur", "PDF"].join(",")]
+      .concat(current().map((r) => [r.year, r.ord, r.author, r.title, r.spec, r.source, r.group, r.rapporteur, r.href].map(q).join(",")));
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
     a.download = `theses-fmpm-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -62,20 +65,26 @@
 
   async function start() {
     try {
-      const [s, d] = await Promise.all([
+      const [s, d, st] = await Promise.all([
         fetch("stats/stats.json", { cache: "no-cache" }).then((r) => r.json()),
         fetch("data/theses.json", { cache: "no-cache" }).then((r) => r.json()),
+        fetch("data/status.json", { cache: "no-cache" }).then((r) => r.json()).catch(() => null),
       ]);
+      if (st) {
+        const day = (iso) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+        statusLine = ` · vérifié le ${day(st.checkedAt)} (contrôle hebdomadaire du site officiel)`;
+      }
       renderCharts(s);
       ROWS = d.data.map((t) => {
-        const spec = Array.isArray(t.category) && t.category.length >= 3 ? t.category[t.category.length - 1] : UNCLASSIFIED;
+        const spec = t.specialite || UNCLASSIFIED;
+        const guess = t.specialiteSource === "titre" ? "déduite du titre" : t.specialiteSource === "rapporteur" ? "déduite du rapporteur" : "";
         return {
           year: t.year, ord: t.ord, title: t.title, author: t.author, rapporteur: t.rapporteur || "",
-          href: t.href && t.href !== "not found" ? t.href : "", spec, guess: t.categorySource === "rapporteur",
-          cluster: s.clusters[spec] || UNCLASSIFIED, n: norm(`${t.title} ${t.author}`),
+          href: t.href && t.href !== "not found" ? t.href : "", spec, guess, source: t.specialiteSource || "",
+          group: t.groupe || UNCLASSIFIED, n: norm(`${t.title} ${t.author}`),
         };
       }).sort((a, b) => b.year - a.year || b.ord - a.ord);
-      fill("fcluster", [...new Set(Object.values(s.clusters))].sort((a, b) => (a === UNCLASSIFIED) - (b === UNCLASSIFIED) || a.localeCompare(b, "fr")));
+      fill("fgroup", [...new Set(ROWS.map((r) => r.group))].sort((a, b) => (a === UNCLASSIFIED) - (b === UNCLASSIFIED) || a.localeCompare(b, "fr")));
       fill("fspec", [...new Set(ROWS.map((r) => r.spec))].sort((a, b) => (a === UNCLASSIFIED) - (b === UNCLASSIFIED) || a.localeCompare(b, "fr")));
       fill("fyear", [...new Set(ROWS.map((r) => r.year))]);
       renderRows();
@@ -86,8 +95,8 @@
 
   let timer;
   $("fq").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(renderRows, 150); });
-  for (const id of ["fcluster", "fspec", "fyear"]) $(id).addEventListener("change", renderRows);
-  $("reset").addEventListener("click", () => { for (const id of ["fq", "fcluster", "fspec", "fyear"]) $(id).value = ""; renderRows(); });
+  for (const id of ["fgroup", "fspec", "fyear"]) $(id).addEventListener("change", renderRows);
+  $("reset").addEventListener("click", () => { for (const id of ["fq", "fgroup", "fspec", "fyear"]) $(id).value = ""; renderRows(); });
   $("csv").addEventListener("click", exportCsv);
   start();
 })();

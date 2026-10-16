@@ -1,12 +1,26 @@
-# Daily refresh: re-reads wd.fmpm.uca.ma (+ lib.fmpm.uca.ma for jury/specialty), redraws the
-# matplotlib dashboard, and commits the result into BOTH sub-projects.
-# The commit then redeploys Vercel (git integration) and pages.yml (workflow_run below).
+# Weekly check of https://wd.fmpm.uca.ma/biblio/theses/Accueil.html (+ lib.fmpm.uca.ma for jury).
+#
+# update_theses.py rebuilds the whole dataset from the sources and compares it with the file in the
+# repo: identical -> "changed=false", the data file is left untouched and charts are NOT redrawn.
+# Different -> new json + matplotlib charts, copied into BOTH sub-projects.
+# status.json (last check date) is committed every week: the site shows "vérifié le …", and the commit
+# counts as repo activity, so GitHub never auto-disables this schedule (60 days without activity).
+# The commit redeploys Vercel (git integration) and GitHub Pages (pages.yml, via workflow_run).
+#
+# Faculty server blocking GitHub's runners? Export the CSV with the FMPM userscript
+# (greasyfork #600588, "Exporter CSV brut") and commit it as vercel-page/json/official-export.csv:
+# it is used for every year the site doesn't answer.
 name: Update data
 
 on:
   schedule:
-    - cron: "17 4 * * *" # every day, 04:17 UTC
+    - cron: "17 4 * * 1" # every Monday, 04:17 UTC
   workflow_dispatch:
+    inputs:
+      redraw_charts:
+        description: "Redraw the charts even if the data did not change (after editing build_charts.py)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -30,27 +44,30 @@ jobs:
 
       - run: pip install -r vercel-page/scripts/requirements.txt
 
-      - name: Refresh thesis list
+      - name: Check the sources, rebuild the data if they changed
+        id: data
         run: python vercel-page/scripts/update_theses.py --json vercel-page/json/file.json
 
-      - name: Draw dashboard (vercel-page)
-        run: python vercel-page/scripts/build_charts.py --json vercel-page/json/file.json --out vercel-page/public/stats
-
-      - name: Copy to github-page
+      - name: Draw dashboard (matplotlib)
+        if: steps.data.outputs.changed == 'true' || inputs.redraw_charts
         run: |
+          python vercel-page/scripts/build_charts.py --json vercel-page/json/file.json --out vercel-page/public/stats
           mkdir -p github-page/data github-page/stats
           cp vercel-page/json/file.json github-page/data/theses.json
           rm -f github-page/stats/*
           cp vercel-page/public/stats/* github-page/stats/
 
-      - name: Commit if something changed
+      - name: Commit
         run: |
+          mkdir -p github-page/data
+          cp vercel-page/json/status.json github-page/data/status.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add vercel-page/json/file.json vercel-page/public/stats github-page/data github-page/stats
+          git add vercel-page/json vercel-page/public/stats github-page/data github-page/stats
           if git diff --cached --quiet; then
-            echo "No change"
+            echo "Nothing to commit"
+          elif [ "${{ steps.data.outputs.changed }}" = "true" ]; then
+            git commit -m "data: official site changed, refresh $(date -u +%F)" && git push
           else
-            git commit -m "data: daily refresh $(date -u +%F)"
-            git push
+            git commit -m "data: weekly check $(date -u +%F), no change" && git push
           fi

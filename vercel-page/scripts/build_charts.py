@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Draw the FMPM thesis dashboard with matplotlib.
 
+Specialties follow the official FMPM list (docs/liste-des-specialites-fmpm.pdf), see specialites.py.
 Inspired by the FMPDF pages (https://cdim.fmp-usmba.ac.ma/stats/dashboard_theses.php and
 .../cartographie_2025/cartographie-theses.html) but computed only from FMPM data.
 
 Every chart is written twice: <id>.png (light) and <id>-dark.png (dark), so a page can swap
 them with <picture><source media="(prefers-color-scheme: dark)">.
 stats.json describes every chart (title, alt text, table of numbers) plus the specialty ->
-cluster map, so the pages render the dashboard generically: add a chart here, it shows up there.
+group map, so the pages render the dashboard generically: add a chart here, it shows up there.
 
 Usage:
   python scripts/build_charts.py                                   # json/file.json -> public/stats/
@@ -29,27 +30,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
+import hashlib  # noqa: E402
+import sys  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from specialites import GROUPS  # noqa: E402  (official FMPM list, docs/liste-des-specialites-fmpm.pdf)
+
 UNCLASSIFIED = "Non classée"
 TOP = 30
-
-# Thematic clusters (like the FMPDF "cartographie"), keyed by accent-free specialty name.
-CLUSTERS = {
-    "Chirurgie et spécialités chirurgicales": [
-        "chirurgie", "traumatologie orthopedie", "urologie nephrologie", "orl", "ophtalmologie",
-        "odonto stomatologie"],
-    "Médecine et spécialités médicales": [
-        "neurologie", "medecine interne", "cardiologie", "pneumologie", "gastro enterologie",
-        "dermatologie", "endocrinologie", "hematologie", "maladies infectieuses", "psychiatrie",
-        "medecine therapeutique"],
-    "Mère et enfant": ["pediatrie", "gynecologie obstetrique"],
-    "Anesthésie, réanimation et urgences": ["anesthesie reanimation", "urgence"],
-    "Cancérologie et imagerie": ["oncologie", "cancerologie", "radiologie"],
-    "Biologie et sciences fondamentales": [
-        "microbiologie", "bacteriologie", "parasitologie", "virologie", "immunologie", "biochimie",
-        "anatomie pathologique", "histologie embryologie", "anatomie", "physiologie", "biophysique",
-        "biologie", "pharmacologie"],
-    "Santé publique": ["sante publique"],
-}
 
 # Study design read from the title. Order matters: the first match wins.
 DESIGNS = [
@@ -91,15 +79,15 @@ def prof_key(name: str) -> str:
 
 
 def specialty(t: dict) -> str:
-    cat = t.get("category")
-    return cat[-1].strip() if isinstance(cat, list) and len(cat) >= 3 else UNCLASSIFIED
+    return t.get("specialite") or UNCLASSIFIED  # official FMPM specialty, set by specialites.classify_all
 
 
-CLUSTER_OF = {spec: cl for cl, specs in CLUSTERS.items() for spec in specs}
+def group(t: dict) -> str:
+    return t.get("groupe") or UNCLASSIFIED
 
 
-def cluster(spec: str) -> str:
-    return CLUSTER_OF.get(norm(spec).replace("-", " "), UNCLASSIFIED)
+SOURCES = [("catalogue", "Catégorie de la bibliothèque"), ("rapporteur", "Déduite du rapporteur"),
+           ("titre", "Déduite du titre")]
 
 
 def design(title: str) -> str:
@@ -148,19 +136,24 @@ def columns(th, xs, ys, main, sub, fmt="{}"):
     return fig
 
 
-def hbars(th, labels, values, main, sub, extra=None, labels_extra=None, neutral=()):
+def hbars(th, labels, values, main, sub, extras=(), main_label=None, neutral=()):
+    """Horizontal bars. extras = [(values, label, hatch), ...] stacked after the main values."""
     n = len(labels)
-    fig, ax = plt.subplots(figsize=(11, 1.3 + 0.27 * n), facecolor=th["surface"])
+    fig, ax = plt.subplots(figsize=(11, 1.3 + 0.27 * n + (0.35 if extras else 0)), facecolor=th["surface"])
     ypos = list(range(n))[::-1]
     colors = [th["neutral"] if lab in neutral else th["series"] for lab in labels]
     ax.barh(ypos, values, height=0.62, color=colors)
     totals = list(values)
-    if extra:
-        ax.barh(ypos, extra, left=values, height=0.62, color=th["inferred"], hatch="////",
+    handles = [Patch(color=th["series"], label=main_label)] if extras else []
+    for vals, label, hatch in extras:
+        ax.barh(ypos, vals, left=totals, height=0.62, color=th["inferred"], hatch=hatch,
                 edgecolor=th["surface"], linewidth=0)
-        totals = [a + b for a, b in zip(values, extra)]
-        legend(ax, th, [Patch(color=th["series"], label=labels_extra[0]),
-                        Patch(facecolor=th["inferred"], hatch="////", edgecolor=th["surface"], label=labels_extra[1])])
+        totals = [a + b for a, b in zip(totals, vals)]
+        handles.append(Patch(facecolor=th["inferred"], hatch=hatch, edgecolor=th["surface"], label=label))
+    if handles:  # own row under the plot, so it never covers a bar
+        leg = fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=9)
+        for t in leg.get_texts():
+            t.set_color(th["text"])
     for y, v in zip(ypos, totals):
         ax.text(v + max(totals) * 0.006, y, str(v), va="center", fontsize=8.5, color=th["text"])
     ax.set_yticks(ypos, labels, fontsize=9)
@@ -170,7 +163,8 @@ def hbars(th, labels, values, main, sub, extra=None, labels_extra=None, neutral=
     style(ax, th, "x")
     ax.tick_params(axis="y", colors=th["text"])
     top = header(fig, th, main, sub)
-    fig.subplots_adjust(left=0.27, right=0.98, top=top, bottom=0.35 / fig.get_figheight())
+    left = min(0.42, 0.06 + 0.0068 * max(len(lab) for lab in labels))  # room for the longest label
+    fig.subplots_adjust(left=left, right=0.98, top=top, bottom=(0.7 if extras else 0.35) / fig.get_figheight())
     return fig
 
 
@@ -188,20 +182,20 @@ def build(json_path: Path, out: Path) -> dict:
     per_year = Counter(t["year"] for t in data)
     detail_year = Counter(t["year"] for t in detailed)
 
-    spellings: dict[str, Counter] = defaultdict(Counter)
-    spec_cat, spec_inf = Counter(), Counter()
+    by_src = defaultdict(Counter)  # specialty -> {source: n}
+    grp_src = defaultdict(Counter)  # group -> {source: n}
     for t in data:
-        s = specialty(t)
-        key = norm(s).replace(" ", "")
-        spellings[key][s] += 1
-        (spec_inf if t.get("categorySource") == "rapporteur" else spec_cat)[key] += 1
-    specs = [{"name": v.most_common(1)[0][0], "catalogue": spec_cat[k], "inferred": spec_inf[k]}
-             for k, v in spellings.items()]
-    specs.sort(key=lambda s: (s["name"] == UNCLASSIFIED, -(s["catalogue"] + s["inferred"])))
-    classified = [s for s in specs if s["name"] != UNCLASSIFIED]
-
-    clusters = Counter(cluster(specialty(t)) for t in data)
-    cluster_rows = sorted(((c, n) for c, n in clusters.items() if c != UNCLASSIFIED), key=lambda x: -x[1])
+        by_src[specialty(t)][t.get("specialiteSource", "none")] += 1
+        grp_src[group(t)][t.get("specialiteSource", "none")] += 1
+    specs = sorted(by_src, key=lambda s: (s == UNCLASSIFIED, -sum(by_src[s].values())))
+    classified = [s for s in specs if s != UNCLASSIFIED]
+    group_of = {s: g for g, ss in GROUPS.items() for s in ss}
+    groups = sorted((g for g in grp_src if g != UNCLASSIFIED), key=lambda g: -sum(grp_src[g].values())) + \
+        ([UNCLASSIFIED] if UNCLASSIFIED in grp_src else [])
+    n_classified = total - sum(by_src[UNCLASSIFIED].values())
+    src_extras = lambda rows, counter: [([counter[r][k] for r in rows], label, h)  # noqa: E731
+                                        for (k, label), h in zip(SOURCES[1:], ("////", "...."))]
+    src_head = [label for _, label in SOURCES]
 
     rapp = Counter(prof_key(t["rapporteur"]) for t in detailed)
     rapp.pop("", None)
@@ -231,7 +225,7 @@ def build(json_path: Path, out: Path) -> dict:
                 city_counts[c] += 1
     city_rows = [(c, n) for c, n in city_counts.most_common() if n >= 3]
 
-    heat_specs = [s["name"] for s in classified[:15]]
+    heat_specs = classified[:15]
     heat_years = [y for y in years if per_year[y] >= 20]
     heat = [[sum(1 for t in data if t["year"] == y and specialty(t) == s) for y in heat_years] for s in heat_specs]
     keep = [j for j in range(len(heat_years)) if any(row[j] for row in heat)]  # years with no specialty data yet
@@ -259,24 +253,23 @@ def build(json_path: Path, out: Path) -> dict:
                              "Part des thèses rédigées en anglais",
                              f"{sum(eng_year.values())} thèses en anglais sur {total} · langue lue dans le catalogue ou devinée sur le titre"))
 
-    add("by-cluster", "Thématiques", f"Répartition par cluster thématique ({len(cluster_rows)})",
-        "Nombre de thèses par grand groupe de spécialités", ["Cluster", "Thèses"],
-        [list(r) for r in cluster_rows] + [[UNCLASSIFIED, clusters[UNCLASSIFIED]]],
-        lambda th: hbars(th, [c for c, _ in cluster_rows] + [UNCLASSIFIED],
-                         [n for _, n in cluster_rows] + [clusters[UNCLASSIFIED]],
-                         f"Répartition par cluster thématique ({len(cluster_rows)})",
-                         "Spécialités regroupées en grands domaines (comme la cartographie FMPDF)",
-                         neutral=(UNCLASSIFIED,)))
+    add("by-group", "Thématiques", "Répartition par groupe de spécialités (liste officielle FMPM)",
+        "Nombre de thèses en médecine, chirurgie et biologie", ["Groupe"] + src_head + ["Total"],
+        [[g] + [grp_src[g][k] for k, _ in SOURCES] + [sum(grp_src[g].values())] for g in groups],
+        lambda th: hbars(th, groups, [grp_src[g]["catalogue"] + grp_src[g]["none"] for g in groups],
+                         "Répartition par groupe de spécialités (liste officielle FMPM)",
+                         f"{n_classified} thèses classées sur {total} ({100 * n_classified / total:.0f} %) · "
+                         f"groupes de la « Liste des spécialités » de la FMPM",
+                         extras=src_extras(groups, grp_src), main_label=SOURCES[0][1], neutral=(UNCLASSIFIED,)))
 
-    add("by-specialty", "Thématiques", f"Répartition des thèses par spécialité ({len(classified)})",
-        "Nombre de thèses par spécialité, catalogue et déduites", ["Spécialité", "Cluster", "Catalogue", "Déduite du rapporteur"],
-        [[s["name"], cluster(s["name"]), s["catalogue"], s["inferred"]] for s in specs],
-        lambda th: hbars(th, [s["name"] for s in specs], [s["catalogue"] for s in specs],
-                         f"Répartition des thèses par spécialité ({len(classified)})",
-                         f"{total} thèses · {sum(s['inferred'] for s in specs)} spécialités déduites du rapporteur "
-                         f"(la bibliothèque ne les renseigne plus depuis 2024)",
-                         extra=[s["inferred"] for s in specs],
-                         labels_extra=("Catalogue de la bibliothèque", "Déduite du rapporteur"), neutral=(UNCLASSIFIED,)))
+    add("by-specialty", "Thématiques", f"Répartition par spécialité officielle ({len(classified)} / 42)",
+        "Nombre de thèses par spécialité de la liste officielle FMPM, selon la source de la classification",
+        ["Spécialité", "Groupe"] + src_head + ["Total"],
+        [[s, group_of.get(s, UNCLASSIFIED)] + [by_src[s][k] for k, _ in SOURCES] + [sum(by_src[s].values())] for s in specs],
+        lambda th: hbars(th, specs, [by_src[s]["catalogue"] + by_src[s]["none"] for s in specs],  # "none" = Non classée row
+                         f"Répartition par spécialité officielle ({len(classified)} / 42)",
+                         "Bibliothèque = catégorie du catalogue · rapporteur / titre = déduction automatique (hachures)",
+                         extras=src_extras(specs, by_src), main_label=SOURCES[0][1], neutral=(UNCLASSIFIED,)))
 
     add("specialty-heatmap", "Thématiques", "Spécialités × années (top 15)",
         "Carte de chaleur du nombre de thèses par spécialité et par année",
@@ -319,14 +312,18 @@ def build(json_path: Path, out: Path) -> dict:
         suffix = "" if mode == "light" else "-dark"
         for c in charts:
             fig = c["_draw"](th)
-            fig.savefig(out / f"{c['id']}{suffix}.png", dpi=144, facecolor=th["surface"])
+            fig.savefig(out / f"{c['id']}{suffix}.png", dpi=144, facecolor=th["surface"],
+                        metadata={"Software": None})  # no version stamp -> same data, same bytes
             plt.close(fig)
 
     stats = {
         "total": total, "lastFetched": last,
-        "kpis": [[total, "thèses"], [len(years), "années"], [len(classified), "spécialités"],
-                 [len(cluster_rows), "clusters"], [len(rapp), "rapporteurs"], [len(detailed), "thèses avec jury connu"]],
-        "clusters": {s["name"]: cluster(s["name"]) for s in specs},
+        # changes whenever the data changes: pages append ?v=<version> to PNG URLs (cache-busting)
+        "version": hashlib.sha256(json.dumps(raw["data"], sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:10],
+        "kpis": [[total, "thèses"], [len(years), "années"], [f"{len(classified)} / 42", "spécialités officielles"],
+                 [f"{100 * n_classified / total:.0f} %", "thèses classées"], [len(rapp), "rapporteurs"],
+                 [len(detailed), "thèses avec jury connu"]],
+        "groups": {s: group_of.get(s, UNCLASSIFIED) for s in specs},
         "charts": [{k: v for k, v in c.items() if k != "_draw"} for c in charts],
     }
     (out / "stats.json").write_text(json.dumps(stats, ensure_ascii=False), "utf-8")

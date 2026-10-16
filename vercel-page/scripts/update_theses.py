@@ -24,14 +24,19 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import sys
+from collections import Counter
 import time
 import unicodedata
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from specialites import classify_all  # noqa: E402  (official FMPM specialty list)
 
 OFFICIAL_BASE = "https://wd.fmpm.uca.ma/biblio/theses/annee-htm/"
 OPAC_URL = "https://lib.fmpm.uca.ma/lib/opac_css/index.php?lvl=more_results&mode=extended&tab=catalog"
@@ -254,45 +259,29 @@ def sanitize(t: dict) -> None:
         t["tags"] = out
 
 
-def prof_key(name: str) -> str:
-    """'Pr M.  EL BAZ ' / 'Pr. M.EL BAZ' -> 'M. EL BAZ' (used to group the same professor)."""
-    n = unicodedata.normalize("NFD", name or "")
-    n = re.sub(r"[̀-ͯ]", "", n).upper()
-    n = re.sub(r"^\s*(PR|PROFESSEUR|DR)\.?\s+", "", n)
-    n = re.sub(r"\.\s*", ". ", n)
-    return re.sub(r"\s+", " ", n).strip()
+def canonical(data) -> str:
+    return json.dumps(data, ensure_ascii=False, sort_keys=True)
 
 
-def infer_specialties(data: list[dict]) -> int:
-    """Since ~2024 the library no longer fills the specialty. Guess it from the rapporteur's
-    past classified theses, only when the answer is clear (>= 3 theses, >= 60 % in one
-    specialty). Guesses are flagged with categorySource="rapporteur" so they stay honest."""
-    from collections import Counter, defaultdict
-    history: dict[str, Counter] = defaultdict(Counter)
-    paths: dict[str, list[str]] = {}
-    for t in data:
-        cat = t.get("category")
-        if isinstance(cat, list) and len(cat) == 3 and t.get("categorySource") != "rapporteur" and t.get("rapporteur"):
-            history[prof_key(t["rapporteur"])][cat[2]] += 1
-            paths[cat[2]] = cat
-    count = 0
-    for t in data:
-        cat = t.get("category")
-        if t.get("categorySource") == "rapporteur":
-            t["category"], t["categorySource"] = None, None  # recompute with fresh history
-        elif isinstance(cat, list) and len(cat) == 3:
-            continue
-        hist = history.get(prof_key(t.get("rapporteur", "")))
-        if not hist:
-            t.pop("categorySource", None)
-            continue
-        spec, n = hist.most_common(1)[0]
-        if sum(hist.values()) >= 3 and n / sum(hist.values()) >= 0.6:
-            t["category"], t["categorySource"] = paths[spec], "rapporteur"
-            count += 1
-        else:
-            t.pop("categorySource", None)
-    return count
+def read_userscript_csv(path: Path) -> dict[int, list[dict]]:
+    """Rows exported by the FMPM userscript (greasyfork #600588, 'Exporter CSV brut'):
+    Année, N°, Auteur, Titre, PDF (texte intégral), Article. Returns {year: rows}."""
+    import csv
+    if not path.exists():
+        return {}
+    out: dict[int, list[dict]] = {}
+    with path.open(encoding="utf-8-sig", newline="") as fh:
+        for r in csv.DictReader(fh):
+            try:
+                year, num = int(r["Année"]), int(r["N°"])
+            except (KeyError, ValueError):
+                continue
+            out.setdefault(year, []).append({
+                "year": year, "ord": num, "author": clean(r.get("Auteur")), "title": clean(r.get("Titre")),
+                "href": (r.get("PDF (texte intégral)") or "").replace("http://", "https://"),
+            })
+    print(f"userscript CSV {path.name}: {sum(map(len, out.values()))} rows, years {sorted(out)}")
+    return out
 
 
 def main() -> int:
@@ -302,9 +291,16 @@ def main() -> int:
     ap.add_argument("--seed", default=None, help="existing data to start from (default: the output file)")
     ap.add_argument("--no-opac", action="store_true", help="skip the library catalogue enrichment")
     ap.add_argument("--from-year", type=int, default=FIRST_YEAR)
+    ap.add_argument("--status", default=None, help="status file (default: status.json next to --json)")
+    ap.add_argument("--csv-fallback", default=None,
+                    help="CSV exported by the FMPM userscript ('Exporter CSV brut'), used for the years the "
+                         "official site doesn't answer (default: official-export.csv next to --json)")
     args = ap.parse_args()
 
     out_path = Path(args.json)
+    status_path = Path(args.status) if args.status else out_path.parent / "status.json"
+    csv_path = Path(args.csv_fallback) if args.csv_fallback else out_path.parent / "official-export.csv"
+    fallback = read_userscript_csv(csv_path)
     seed_path = Path(args.seed) if args.seed else out_path
     seed = json.loads(seed_path.read_text("utf-8"))["data"] if seed_path.exists() else []
     print(f"seed: {len(seed)} records from {seed_path}")
@@ -321,14 +317,19 @@ def main() -> int:
     this_year = dt.date.today().year
     official: list[dict] = []
     reachable_years = 0
+    from_csv: list[int] = []
     for year in range(args.from_year, this_year + 1):
         rows = fetch_official_year(year)
         time.sleep(PAUSE_S)
+        if rows is None and fallback.get(year):
+            rows = fallback[year]
+            from_csv.append(year)
+            print(f"  official {year}: site unreachable, using {len(rows)} rows from {csv_path.name}")
         if rows is not None:
             reachable_years += 1
             official += rows
     if reachable_years == 0:
-        print("official site unreachable: keeping the current file untouched", file=sys.stderr)
+        print("official site unreachable and no userscript CSV: keeping the current file untouched", file=sys.stderr)
         return 1
 
     # Which years need OPAC details: theses we don't know yet, or known ones with no rapporteur
@@ -361,16 +362,42 @@ def main() -> int:
             enriched += 1
 
     data = sorted(by_key.values(), key=lambda t: (t["year"], t["ord"])) + unkeyed
-    inferred = infer_specialties(data)
+    sources = classify_all(data)
     if len(data) < 0.9 * len(seed):
         print(f"refusing to write: {len(data)} records vs {len(seed)} before", file=sys.stderr)
         return 1
 
-    last = dt.datetime.now(dt.timezone.utc).strftime("%a, %b %d, %Y, %I:%M %p UTC")
+    # Change detection: the output is rebuilt from the sources every time, so "did the sources change?"
+    # == "is the new data different from the file on disk?". Unchanged -> leave the file (and its
+    # lastFetched date) alone, so git sees no diff and charts/deploys are skipped.
+    now = dt.datetime.now(dt.timezone.utc)
+    previous = json.loads(out_path.read_text("utf-8")) if out_path.exists() else {"data": None}
+    changed = canonical(previous["data"]) != canonical(data)
+    old_status = json.loads(status_path.read_text("utf-8")) if status_path.exists() else {}
+    status = {
+        "checkedAt": now.isoformat(timespec="minutes"),
+        "dataChangedAt": now.isoformat(timespec="minutes") if changed else old_status.get("dataChangedAt"),
+        "changed": changed,
+        "theses": len(data),
+        "officialSource": "site" if not from_csv else f"userscript CSV for {from_csv}",
+        "officialPerYear": {str(y): n for y, n in sorted(Counter(r["year"] for r in official).items())},
+        "specialiteSources": dict(sources),
+    }
+    status_path.parent.mkdir(parents=True, exist_ok=True)
+    status_path.write_text(json.dumps(status, ensure_ascii=False, indent=1), "utf-8")
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+            fh.write(f"changed={'true' if changed else 'false'}\n")
+    if not changed:
+        print(f"no change: {out_path} left untouched ({len(data)} theses); status -> {status_path}")
+        return 0
+
+    last = now.strftime("%a, %b %d, %Y, %I:%M %p UTC")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps({"lastFetched": last, "data": data}, ensure_ascii=False), "utf-8")
-    print(f"wrote {out_path}: {len(data)} theses (+{added} new, {enriched} enriched, "
-          f"{inferred} specialties inferred from the rapporteur)")
+    print(f"wrote {out_path}: {len(data)} theses (+{added} new, {enriched} enriched) · official specialty from "
+          f"catalogue {sources['catalogue']}, rapporteur {sources['rapporteur']}, title {sources['titre']}, "
+          f"unclassified {sources['none']}")
     return 0
 
 
