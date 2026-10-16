@@ -1,0 +1,39 @@
+# Publishes ONLY the github-page/ folder to GitHub Pages.
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["github-page/**", ".github/workflows/pages.yml"]
+  workflow_run: # commits made by update-data.yml don't trigger "push", so listen for it here
+    workflows: ["Update data"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main # workflow_run would otherwise check out the commit BEFORE the data refresh
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: github-page
+      - id: deployment
+        uses: actions/deploy-pages@v4

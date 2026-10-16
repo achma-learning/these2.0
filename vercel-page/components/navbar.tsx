@@ -26,6 +26,16 @@ const Navbar = (props: Props) => {
                 Categories
               </p>
             </Link>
+            <Link href={"/dashboard"}>
+              <p
+                className={cn(
+                  pathname === "/dashboard" ? "font-semibold" : "font-light",
+                  "text-white"
+                )}
+              >
+                Dashboard
+              </p>
+            </Link>
             <Link href={"/search"}>
               <p
                 className={cn(

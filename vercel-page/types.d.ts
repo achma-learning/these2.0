@@ -18,6 +18,7 @@ type These = {
   membreAssocie:  string[] | null;
   profs: string[];
   href: string;
+  categorySource?: "rapporteur" | null; // set by scripts/update_theses.py when the specialty was guessed from the rapporteur
   // cote: string;
 };
 type sort =

@@ -1,0 +1,36 @@
+# For the These2.0 repository (this folder = repo root). Inactive while it sits inside
+# achma-learning/these2.0, because GitHub only runs workflows from the repo-root .github/.
+#
+# Daily refresh: re-reads wd.fmpm.uca.ma (+ lib.fmpm.uca.ma for jury/specialty), redraws the
+# matplotlib dashboard (public/stats/), commits. Vercel redeploys on the push by itself.
+# Needed because Vercel's file system is read-only: /api/renew-data cannot write json/file.json there.
+name: Update data
+
+on:
+  schedule:
+    - cron: "17 4 * * *" # every day, 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
+      - run: python scripts/update_theses.py
+      - run: python scripts/build_charts.py
+      - name: Commit if something changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add json/file.json public/stats
+          git diff --cached --quiet || { git commit -m "data: daily refresh $(date -u +%F)"; git push; }
