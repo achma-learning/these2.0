@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>These2.0 Dashboard</title>
-  <meta name="description" content="Tableau de bord des thèses FMPM : années, clusters, spécialités, rapporteurs, types d'étude, villes (graphiques matplotlib mis à jour chaque jour).">
+  <meta name="description" content="Tableau de bord des thèses FMPM : années, spécialités officielles, rapporteurs, types d'étude, villes (graphiques matplotlib, vérifiés chaque semaine).">
   <link rel="icon" href="assets/icon.png">
   <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -27,7 +27,7 @@
       <h2>Filtrage dynamique</h2>
       <div class="controls">
         <input id="fq" type="search" placeholder="Recherche rapide dans le titre ou l'auteur" aria-label="Recherche rapide">
-        <select id="fcluster" aria-label="Cluster"><option value="">Cluster</option></select>
+        <select id="fgroup" aria-label="Groupe"><option value="">Groupe</option></select>
         <select id="fspec" aria-label="Spécialité"><option value="">Spécialité</option></select>
         <select id="fyear" aria-label="Année"><option value="">Année</option></select>
         <button id="reset" class="btn" type="button">Réinitialiser</button>
@@ -36,17 +36,19 @@
       <p class="meta" id="fmeta" aria-live="polite"></p>
       <div class="scroll tall">
         <table>
-          <thead><tr><th>Année</th><th>N°</th><th>Spécialité</th><th>Cluster</th><th>Titre de la thèse</th><th>PDF</th></tr></thead>
+          <thead><tr><th>Année</th><th>N°</th><th>Spécialité</th><th>Groupe</th><th>Titre de la thèse</th><th>PDF</th></tr></thead>
           <tbody id="frows"></tbody>
         </table>
       </div>
     </section>
 
     <p class="sub">
-      Jurys, mots-clés et spécialités viennent du catalogue de la bibliothèque, qui n'a pas encore
-      catalogué la plupart des thèses récentes. Depuis 2024 la spécialité n'y est plus renseignée :
-      elle est alors déduite des thèses précédentes du rapporteur (hachures sur le graphique).
-      Type d'étude et villes sont lus dans le titre : ce sont des estimations.
+      Spécialités et groupes suivent la <a href="https://github.com/achma-learning/these2.0/blob/main/vercel-page/docs/liste-des-specialites-fmpm.pdf">liste officielle des spécialités de la FMPM</a>.
+      Quand la bibliothèque n'a pas classé une thèse (presque toutes depuis 2024), la spécialité est
+      déduite des autres thèses du rapporteur, ou du titre si le modèle est assez sûr (hachures sur
+      les graphiques, « ? » dans le tableau). Type d'étude et villes sont lus dans le titre : ce sont
+      des estimations. Le site officiel est contrôlé chaque semaine ; graphiques et données ne sont
+      régénérés que s'il a changé.
     </p>
   </main>
   <footer>

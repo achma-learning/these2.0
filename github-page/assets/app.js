@@ -11,7 +11,12 @@
   const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[’'`]/g, "'").toLowerCase();
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const specOf = (t) => (Array.isArray(t.category) && t.category.length >= 3 ? t.category[t.category.length - 1] : UNCLASSIFIED);
+  // official FMPM specialty (scripts/specialites.py); "rapporteur" / "titre" sources are automatic guesses
+  const specOf = (t) => t.specialite || UNCLASSIFIED;
+  const isGuess = (t) => t.specialiteSource === "rapporteur" || t.specialiteSource === "titre";
+  const guessTitle = (t) => t.specialiteSource === "titre"
+    ? `Spécialité déduite du titre${t.specialiteConfiance ? ` (confiance ${Math.round(t.specialiteConfiance * 100)} %)` : ""}`
+    : "Spécialité déduite des autres thèses du rapporteur";
 
   let ALL = [];
   let page = 1;
@@ -68,8 +73,8 @@
       ? `<a href="${esc(t.href)}" target="_blank" rel="noopener">PDF</a>` : "<em>sans PDF</em>";
     const spec = specOf(t);
     const chips = [
-      t.categorySource === "rapporteur"
-        ? `<span class="chip guess" title="Spécialité déduite du rapporteur">${esc(spec)} ?</span>`
+      isGuess(t)
+        ? `<span class="chip guess" title="${esc(guessTitle(t))}">${esc(spec)} ?</span>`
         : `<span class="chip">${esc(spec)}</span>`,
       `<span class="chip">${t.langue.includes("eng") ? "Anglais" : "Français"}</span>`,
       ...(t.tags || []).slice(0, 6).map((k) => `<span class="chip">${highlight(k, raw)}</span>`),
@@ -110,6 +115,15 @@
     for (const v of values) sel.insertAdjacentHTML("beforeend", `<option value="${esc(v)}">${esc(v)}</option>`);
   }
 
+  // data/status.json is rewritten by the weekly check even when nothing changed
+  async function statusText() {
+    try {
+      const st = await (await fetch("data/status.json", { cache: "no-cache" })).json();
+      const d = (iso) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+      return ` · vérifié le ${d(st.checkedAt)}`;
+    } catch { return ""; }
+  }
+
   async function start() {
     try {
       const res = await fetch("data/theses.json", { cache: "no-cache" });
@@ -117,13 +131,13 @@
       ALL = data.map((t) => ({
         t,
         spec: specOf(t),
-        n: norm([t.title, t.author, t.year, (t.tags || []).join(" "), (t.category || []).join(" "),
+        n: norm([t.title, t.author, t.year, (t.tags || []).join(" "), (t.category || []).join(" "), t.specialite || "",
           (t.profs || []).join(" ")].join(" ")),
       }));
       fillSelect("year", [...new Set(data.map((t) => t.year))].sort((a, b) => b - a));
       fillSelect("spec", [...new Set(ALL.map((x) => x.spec))].sort((a, b) =>
         (a === UNCLASSIFIED) - (b === UNCLASSIFIED) || a.localeCompare(b, "fr")));
-      $("sub").textContent = `${data.length} thèses · mis à jour ${lastFetched} · recherche sans accents, tous les mots doivent être présents`;
+      $("sub").textContent = `${data.length} thèses · données du ${lastFetched}${await statusText()} · recherche sans accents, tous les mots doivent être présents`;
       readParams();
       render();
     } catch (e) {

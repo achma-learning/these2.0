@@ -14,13 +14,14 @@ type Chart = {
 type Stats = {
   total: number;
   lastFetched: string;
+  version: string; // hash of the data: appended as ?v= so browsers never show a cached old chart
   kpis: [number, string][];
   charts: Chart[];
 };
 
 export const metadata: Metadata = {
   title: "These2.0 | Dashboard",
-  description: "Tableau de bord des thèses FMPM : années, clusters, spécialités, rapporteurs, types d'étude, villes",
+  description: "Tableau de bord des thèses FMPM : années, spécialités officielles, rapporteurs, types d'étude, villes",
 };
 
 const getStats = async (): Promise<Stats | null> => {
@@ -36,13 +37,13 @@ const getStats = async (): Promise<Stats | null> => {
 const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-const ChartBlock = ({ chart }: { chart: Chart }) => (
+const ChartBlock = ({ chart, v }: { chart: Chart; v: string }) => (
   <section>
-    <a href={`/stats/${chart.id}.png`} target="_blank" rel="noopener noreferrer" title="Ouvrir en grand">
+    <a href={`/stats/${chart.id}.png?v=${v}`} target="_blank" rel="noopener noreferrer" title="Ouvrir en grand">
       <picture>
-        <source srcSet={`/stats/${chart.id}-dark.png`} media="(prefers-color-scheme: dark)" />
+        <source srcSet={`/stats/${chart.id}-dark.png?v=${v}`} media="(prefers-color-scheme: dark)" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/stats/${chart.id}.png`} alt={chart.alt} className="w-full h-auto rounded-md border bg-white" loading="lazy" />
+        <img src={`/stats/${chart.id}.png?v=${v}`} alt={chart.alt} className="w-full h-auto rounded-md border bg-white" loading="lazy" />
       </picture>
     </a>
     <details className="mt-2 text-sm">
@@ -71,8 +72,20 @@ const ChartBlock = ({ chart }: { chart: Chart }) => (
   </section>
 );
 
+// json/status.json is rewritten by the weekly check (scripts/update_theses.py), even when nothing changed
+const getCheckedAt = async (): Promise<string | null> => {
+  try {
+    const file = path.join(process.cwd(), "json/status.json");
+    const { checkedAt } = JSON.parse(await fsPromises.readFile(file, "utf-8"));
+    return new Date(checkedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  } catch {
+    return null;
+  }
+};
+
 const Page = async () => {
   const stats = await getStats();
+  const checkedAt = await getCheckedAt();
   if (!stats) {
     return <p className="p-12 text-lg">Dashboard not generated yet — run <code>python scripts/build_charts.py</code>.</p>;
   }
@@ -82,8 +95,9 @@ const Page = async () => {
       <div>
         <h1 className="font-semibold text-3xl text-neutral-800">Tableau de bord des thèses FMPM</h1>
         <p className="text-slate-700 mt-1">
-          {stats.total} thèses · mis à jour {stats.lastFetched} · sources : wd.fmpm.uca.ma (liste officielle) et
-          lib.fmpm.uca.ma (jury, spécialité)
+          {stats.total} thèses · données du {stats.lastFetched}
+          {checkedAt ? ` · vérifié le ${checkedAt} (contrôle hebdomadaire)` : ""} · sources : wd.fmpm.uca.ma (liste
+          officielle) et lib.fmpm.uca.ma (jury)
         </p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -107,14 +121,15 @@ const Page = async () => {
           {stats.charts
             .filter((c) => c.section === s)
             .map((c) => (
-              <ChartBlock key={c.id} chart={c} />
+              <ChartBlock key={c.id} chart={c} v={stats.version} />
             ))}
         </div>
       ))}
       <p className="text-sm text-slate-700">
-        Jurys, mots-clés et spécialités viennent du catalogue de la bibliothèque, qui n&apos;a pas encore catalogué la
-        plupart des thèses récentes. Depuis 2024 la spécialité est déduite des thèses précédentes du rapporteur
-        (hachures). Type d&apos;étude et villes sont lus dans le titre : ce sont des estimations.
+        Spécialités et groupes suivent la liste officielle des spécialités de la FMPM (docs/liste-des-specialites-fmpm.pdf).
+        Quand la bibliothèque n&apos;a pas classé une thèse, la spécialité est déduite des autres thèses du rapporteur,
+        ou du titre si le modèle est assez sûr (hachures). Type d&apos;étude et villes sont lus dans le titre : ce sont
+        des estimations.
       </p>
       <footer className="border-t pt-4 text-sm text-slate-600 text-center">
         Graphiques générés avec matplotlib ·{" "}

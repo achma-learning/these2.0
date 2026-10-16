@@ -1,9 +1,10 @@
 # These2.0 — FMPM theses, always up to date
 
 Search engine + dashboard for the theses of the Faculté de Médecine et de Pharmacie de Marrakech
-(FMPM). Data is re-read every day from the official catalogue
-<https://wd.fmpm.uca.ma/biblio/theses/Accueil.html>, with jury and specialty details from the
-library catalogue (lib.fmpm.uca.ma). Charts are drawn with matplotlib.
+(FMPM). The official catalogue <https://wd.fmpm.uca.ma/biblio/theses/Accueil.html> is checked
+every week; data and matplotlib charts are regenerated only when it changed. Jury details come from
+the library catalogue (lib.fmpm.uca.ma); every thesis is classified into the official FMPM specialty
+list (`vercel-page/docs/liste-des-specialites-fmpm.pdf`).
 
 | Folder | What it is | Deployed where |
 |---|---|---|
@@ -11,8 +12,14 @@ library catalogue (lib.fmpm.uca.ma). Charts are drawn with matplotlib.
 | [`vercel-page/`](./vercel-page) | The original Next.js app by Akram Ammour, upgraded (fresh data, `/dashboard`) — to send back to its author | Vercel (root directory = `vercel-page`) |
 | `these2.0-v1-original.zip` | Read-only backup of the original code (commit `29a96f5`). Never edit. | — |
 
-Daily refresh: `.github/workflows/update-data.yml` runs `vercel-page/scripts/update_theses.py` and
-`build_charts.py`, then copies the results into `github-page/`.
+Weekly check (Monday 04:17 UTC): `.github/workflows/update-data.yml` runs
+`vercel-page/scripts/update_theses.py`. If the rebuilt data differs from the committed file, it also
+runs `build_charts.py` and copies everything into `github-page/`; otherwise only `status.json`
+("vérifié le …") is committed. Run it by hand from Actions → Update data → Run workflow.
+
+If the faculty server blocks GitHub's robots: install the FMPM userscript (greasyfork #600588), click
+"Exporter CSV brut" on the official site, and commit the file as `vercel-page/json/official-export.csv`.
+The next run uses it for every year the site doesn't answer.
 
 Run the data pipeline by hand:
 
