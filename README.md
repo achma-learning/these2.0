@@ -11,7 +11,7 @@ list (`vercel-page/docs/liste-des-specialites-fmpm.pdf`).
 | Site | URL |
 |---|---|
 | Original project (Akram Ammour) | <https://thesefmpm.vercel.app/> |
-| My fork (Next.js, upgraded) | <https://these2-0.vercel.app/> |
+| My fork (Next.js, upgraded) | <https://thesefmpm3.vercel.app/> |
 | GitHub Pages (static) | <https://achma-learning.github.io/these2.0/github-page/> |
 
 | Folder | What it is | Deployed where |
