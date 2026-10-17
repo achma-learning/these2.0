@@ -1,6 +1,8 @@
 # These2.0 (FMPM theses) — AI Context File
 _Last synced: 2026-10-17 @ 2525474 + branch `claude/zealous-ptolemy-v8xtxg` (interactive dashboard charts, live-site links)_
 
+> **2026-10-17 restructure:** this repo is now **Vercel-only** (`vercel-page/`). The GitHub Pages site (`github-page/`) moved to `achma-learning/theses-maroc` under `these2/`; the full previous layout is on branch `old`. Sections below that mention `github-page/` / `pages.yml` describe branch `old`.
+
 ## 1. What This Is (Plain English)
 - **In one sentence:** a search engine and a stats dashboard for the ~4,000 medical theses defended at the Marrakech faculty of medicine (FMPM). It checks the faculty's own website every week and updates itself when something changed.
 - **Why it exists:** the official catalogue (wd.fmpm.uca.ma) is one plain HTML page per year with no search and no stats. These2.0 (by Akram Ammour) added search, but its data froze in June 2024. This repo makes it current again, adds charts like the Fès faculty dashboard, and sorts every thesis into the faculty's official specialty list.
