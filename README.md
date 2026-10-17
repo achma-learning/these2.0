@@ -33,6 +33,5 @@ python vercel-page/scripts/update_theses.py      # refresh vercel-page/json/file
 python vercel-page/scripts/build_charts.py       # redraw vercel-page/public/stats/
 ```
 
-Preview the static site: `python -m http.server` at the repo root, open <http://localhost:8000/github-page/>.
 
 AI assistants: read [`CONTEXT.md`](./CONTEXT.md) first.
