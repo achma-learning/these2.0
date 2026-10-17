@@ -1,5 +1,5 @@
 # These2.0 (FMPM theses) — AI Context File
-_Last synced: 2026-10-16 @ fa862b4 + branch `claude/wonderful-wozniak-at61ir` (weekly check, official specialties, userscript CSV fallback)_
+_Last synced: 2026-10-17 @ 2525474 + branch `claude/zealous-ptolemy-v8xtxg` (interactive dashboard charts, live-site links)_
 
 ## 1. What This Is (Plain English)
 - **In one sentence:** a search engine and a stats dashboard for the ~4,000 medical theses defended at the Marrakech faculty of medicine (FMPM). It checks the faculty's own website every week and updates itself when something changed.
@@ -15,7 +15,7 @@ Two sub-projects, deliberately separate:
 - **Deploy:** automatic.
   - Every Monday at 04:17 UTC, `.github/workflows/update-data.yml` checks the sources. It redraws the charts and copies them only if the data changed; on quiet weeks it commits just `status.json`.
   - `.github/workflows/pages.yml` publishes `github-page/` (Pages source must be "GitHub Actions").
-  - Vercel: project Root Directory = `vercel-page`, redeploys on push.
+  - Vercel: project Root Directory = `vercel-page`, redeploys on push. Live: <https://these2-0.vercel.app/> (ours), <https://thesefmpm.vercel.app/> (Akram's original), <https://achma-learning.github.io/these2.0/github-page/> (Pages).
   - Manual run: Actions → Update data → Run workflow. Tick "redraw_charts" after editing `build_charts.py`.
 - **Required env vars:** none.
 
@@ -37,7 +37,8 @@ Two sub-projects, deliberately separate:
 - `vercel-page/scripts/specialites.py`: official list (`GROUPS`), library-category → official mapping with title-keyword splits (`split_catalogue`), the `OBVIOUS` keyword list, Naive Bayes (`NaiveBayes`), `classify_all`, and `cross_validate` (accuracy check).
 - `vercel-page/scripts/build_charts.py`: 10 matplotlib charts, written as `<id>.png` + `<id>-dark.png`, plus `stats.json` (chart list with tables, KPIs, specialty→group map, `version` hash).
 - `github-page/index.html` + `assets/app.js`: search (client-side over `data/theses.json`, URL-synced filters, "?" chips for guessed specialties).
-- `github-page/dashboard.html` + `assets/dashboard.js`: renders charts generically from `stats/stats.json` (with `?v=version`), the "Filtrage dynamique" table, CSV export, and the "vérifié le" line from `data/status.json`.
+- `github-page/assets/charts.js`: **interactive SVG charts**, drawn in the browser from the `table` of each chart in `stats.json` (no library). One renderer per chart id in `RENDER` (bars, stacked bars, heatmap, top-N lists); an id with no renderer falls back to its PNG. Hover tooltip, keyboard focus, click → `onPick`.
+- `github-page/dashboard.html` + `assets/dashboard.js`: fetches `stats.json`/`theses.json`/`status.json` with `cache: "no-cache"` on every visit, so charts update as soon as the Action commits new data (no PNG needed). A click on a mark (`applyPick`) filters the "Filtrage dynamique" table: year, group, specialty, city (title search), keyword (library tags), professor/rapporteur (same `prof_key` rule as `build_charts.py`). Bottom-right "⬇ PNG" button on each chart downloads the matplotlib PNG (dark one if the page is dark). Also CSV export and the "vérifié le" line.
 - `vercel-page/app/(routes)/dashboard/page.tsx`: same dashboard in Next (prerendered at build).
 - `vercel-page/types.d.ts`: the `These` type. New fields: `specialite`, `groupe`, `specialiteSource`, `specialiteConfiance`.
 - `vercel-page/lib/renew-lib.ts` + `actions/renew-data.ts` + `app/api/renew-data`: the ORIGINAL TS scraper. Superseded; kept for the author.
@@ -52,10 +53,12 @@ Two sub-projects, deliberately separate:
 - **The pipeline must stay deterministic** (same sources → same bytes). Change detection relies on it: no timestamps or randomness inside `data`, sorted output, `metadata={"Software": None}` on PNGs.
 - Be polite to the faculty servers: `PAUSE_S = 1.0`, OPAC pages of 100, retries with backoff, no parallel requests. The user once stopped a 500-records-per-page OPAC query.
 - Charts: one series = one hue (`#2a78d6` light / `#3987e5` dark), always light + dark PNGs, "Non classée" in gray and last, the legend in its own row under stacked bars.
-- github-page stays zero-dependency, with no external scripts.
+- github-page stays zero-dependency, with no external scripts. Charts are SVG drawn by `charts.js`; matplotlib stays the PNG download option.
+- **A new chart** = add it in `build_charts.py` (PNG + table, shows up with its PNG) and, to make it clickable, add a renderer in `charts.js: RENDER` keyed by the same id. Colours come from CSS variables (`--accent`, `--c0..c3`, `--inferred`, `--neutral`), never hard-coded.
 
 ## 6. Fragile Bits & Landmines
 - **Change detection = output diff.** `update_theses.py` rebuilds everything and compares `canonical(data)` with the committed file. Unchanged means the file (and its `lastFetched`) is left alone. Anything non-deterministic added to the data would make every week look "changed".
+- **Dynamic charts read `stats.json` tables, not `theses.json`.** They are only as fresh as the last pipeline run; a chart's numbers and its PNG always agree. A click filters from `theses.json`, so its count must equal the bar (checked: Pr M. BOUSKRAOUI 68, "traitement" 317, Pr L. ESSAADOUNI 236). If you change how `build_charts.py` counts something, change the matching filter in `dashboard.js`.
 - **Cache-busting:** chart PNGs keep the same file names, so pages append `?v=<stats.version>` (a hash of the data). Remove it and visitors may see last month's chart.
 - **Schedules die after 60 idle days** on public repos. The weekly `status.json` commit is what keeps the schedule alive; don't skip it to "reduce noise".
 - **`pages.yml` uses `workflow_run`** because pushes made with `GITHUB_TOKEN` don't trigger other workflows. Don't "simplify" it to `push` only.
@@ -76,6 +79,7 @@ Two sub-projects, deliberately separate:
   - New charts "par groupe" and "par spécialité officielle", stacked by classification source.
   - Userscript CSV fallback.
   - Earlier the same day: split into `github-page/` + `vercel-page/`, Python pipeline (3,219 → 4,014 theses), 10 matplotlib charts, Pages deploy, backup zip. PR: achma-learning/these2.0#1.
+- **Shipped 2026-10-17:** interactive SVG dashboard (click → filters the table, "⬇ PNG" per chart), live-site links in README, Vercel deploy of `vercel-page/` (root directory = `vercel-page`). `vercel-page`'s own `/dashboard` still shows static PNGs.
 - **Working on now:** merge, enable Pages (Settings → Pages → Source: GitHub Actions), run "Update data" once by hand.
 - **Next up:**
   1. Send `vercel-page/` to Akram Ammour (original author). Its Next "Categories" page still uses the library category; it could switch to `specialite`.
