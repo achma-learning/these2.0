@@ -6,6 +6,14 @@ every week; data and matplotlib charts are regenerated only when it changed. Jur
 the library catalogue (lib.fmpm.uca.ma); every thesis is classified into the official FMPM specialty
 list (`vercel-page/docs/liste-des-specialites-fmpm.pdf`).
 
+## Live sites
+
+| Site | URL |
+|---|---|
+| Original project (Akram Ammour) | <https://these2-0.vercel.app/> |
+| My fork (Next.js, upgraded) | <https://these2-0.vercel.app/> |
+| GitHub Pages (static) | <https://achma-learning.github.io/these2.0/github-page/> |
+
 | Folder | What it is | Deployed where |
 |---|---|---|
 | [`github-page/`](./github-page) | Our static site (plain HTML/JS): search + dashboard | GitHub Pages (`.github/workflows/pages.yml`) |
