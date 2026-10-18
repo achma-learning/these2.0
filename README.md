@@ -15,7 +15,7 @@ full previous structure of this repo is kept on the [`old`](https://github.com/a
 | Site | URL |
 |---|---|
 | Original project (Akram Ammour) | <https://thesefmpm.vercel.app/> |
-| This repo (Next.js, upgraded) | <https://these2-0.vercel.app/> |
+| This repo (Next.js, upgraded) | <https://thesefmpm3.vercel.app/search> |
 
 `vercel-page/` is the Next.js app (Vercel root directory = `vercel-page`). `these2.0-v1-original.zip` is a read-only backup of the original code.
 
