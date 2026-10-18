@@ -1,5 +1,5 @@
 # These2.0 (FMPM theses) — AI Context File
-_Last synced: 2026-10-17 @ 2525474 + branch `claude/zealous-ptolemy-v8xtxg` (interactive dashboard charts, live-site links)_
+_Last synced: 2026-10-18 (branch `claude/eager-dirac-wiu2sc`: final FMPM classification (pass 0) ported to vercel-page)_
 
 > **2026-10-17 restructure:** this repo is now **Vercel-only** (`vercel-page/`). The GitHub Pages site (`github-page/`) moved to `achma-learning/theses-maroc` under `these2/`; the full previous layout is on branch `old`. Sections below that mention `github-page/` / `pages.yml` describe branch `old`.
 
@@ -74,6 +74,7 @@ Two sub-projects, deliberately separate:
 - **Skip on cleanup:** `vercel-page/json/file copy.json` (author's old snapshot). `vercel-page/.github/workflows/` is inert here on purpose: it's for the author's repo.
 
 ## 7. Current State
+- **Shipped 2026-10-18:** `vercel-page` now uses the **final FMPM classification** first (pass 0 of `scripts/specialites.py`, ported from theses-maroc): `json/theses-fmpm-specialites.csv` (copy of theses-maroc `archive/fmpm/`, built in achma-learning/these by `classer_fmpm.py`: two-step barycentre — option then specialty — of the cover-page jury, library category and title; 93/113 on an independent ground truth). Its `Statut` becomes `specialiteSource` (`confirmée` / `vérifiée` / `probable` / `à vérifier`); the old passes only cover theses the file doesn't have yet. Unclassified 197 → 2 (confirmée 3 532, probable 467, à vérifier 3). New `scripts/reclassify.py` (rerun the classification on `json/file.json` offline), `build_charts.py` maps statuses to its 3 columns (plein = confirmée, hachures = probable / à vérifier), `types.d.ts` widened. **After a new classification in achma-learning/these:** copy the CSV to `vercel-page/json/`, run `reclassify.py` then `build_charts.py`.
 - **Last shipped (2026-10-16):**
   - Weekly check with change detection. Verified: a second run on unchanged sources gave "no change" and a byte-identical file (same md5).
   - `status.json` and a "vérifié le …" line on both sites; `?v=` cache-busting on charts.
