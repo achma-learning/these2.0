@@ -60,6 +60,7 @@ const SearchInput = ({ showOptions }: Props) => {
     params.delete("lang");
     params.delete("year");
     params.delete("categ");
+    params.delete("spe");
     params.delete("page"); // for user to return to 1st page
     startTransition(() => {
       router.replace(`${pathname}?${params.toString()}`);

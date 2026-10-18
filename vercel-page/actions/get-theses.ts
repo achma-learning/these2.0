@@ -8,6 +8,7 @@ type getThese = {
   searchParams: {
     search?: string;
     category?: string;
+    spe?: string; // official FMPM specialty (These.specialite)
     langue?: "fr" | "eng";
     year?: number;
   };
@@ -19,7 +20,7 @@ type getThese = {
 // get these based on searchParams (search,category,langue,year) and sort and page and nbPerPage
 
 export const getTheses = async ({
-  searchParams: { category, langue, search, year },
+  searchParams: { category, spe, langue, search, year },
   sort,
   page,
   nbPerPage,
@@ -43,6 +44,8 @@ export const getTheses = async ({
         ...(year && { year }),
       });
     }
+
+    if (spe) result = result.filter((t) => t.specialite === spe);
 
     // sorts the data according to the user preference though it has a default sort of year:"asc" and order:"asc"
     const sortedData = await sortData(result, sort);

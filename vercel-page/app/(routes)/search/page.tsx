@@ -5,6 +5,7 @@ import SearchInput from "@/components/searchInput";
 import { getSearchParams } from "@/lib/utils";
 import { writeFileSync } from "fs";
 import { Metadata } from "next";
+import Link from "next/link";
 
 type Props = {
   searchParams: searchParams;
@@ -15,14 +16,14 @@ export const metadata: Metadata = {
   description: "Search for title, author, category, tag, prof...",
 };
 const page = async ({ searchParams }: Props) => {
-  const { categ, lang, search, sort, year, page } = await getSearchParams(
+  const { categ, spe, lang, search, sort, year, page } = await getSearchParams(
     searchParams
   );
   const isShowOptions = !!categ || !!lang || !!year;
 
   const { pageData, totalPages, totalTheses } =
     await getTheses({
-      searchParams: { search: search, category: categ, langue: lang, year },
+      searchParams: { search: search, category: categ, spe, langue: lang, year },
       nbPerPage: 50,
       page: page,
       sort: sort,
@@ -32,6 +33,14 @@ const page = async ({ searchParams }: Props) => {
     // todo fix this bug where if user searches for something in page nth n!== 1 with search different than prv return to page 1
     <div className="h-full flex flex-col max-w-7xl m-auto">
       <SearchInput showOptions={isShowOptions} />
+
+      {spe ? (
+        <p className="px-8 text-sm text-slate-700">
+          Spécialité officielle FMPM : <span className="font-semibold">{spe}</span> ·{" "}
+          <Link href="/categories" className="underline">autres spécialités</Link> ·{" "}
+          <Link href={`/dashboard?spe=${encodeURIComponent(spe)}`} className="underline">graphiques</Link>
+        </p>
+      ) : null}
 
       <QueryListing
         data={pageData}
