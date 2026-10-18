@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { Search, X } from "lucide-react";
+import { Download, Search, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Heatmap, HBars, Legend, Row, Stack, Tip, YearBars } from "@/components/dashboard/charts";
@@ -27,15 +27,33 @@ const count = <K,>(rows: Rec[], key: (r: Rec) => K | null) => {
 const ranked = (m: Map<string, number>, n?: number): Row[] =>
   Array.from(m, ([key, value]) => ({ key, value })).sort((a, b) => b.value - a.value).slice(0, n);
 
-const Section = ({ title, note, children, className }: { title: string; note?: string; children: React.ReactNode; className?: string }) => (
-  <Card className={`p-4 bg-white/80 min-w-0 ${className || ""}`}>
+// matplotlib image of a chart (scripts/build_charts.py → public/stats/<id>.png), all theses, no filters.
+export type Png = { id: string; title: string; label?: string };
+
+const Section = ({ title, note, children, className, png, v }: {
+  title: string; note?: string; children: React.ReactNode; className?: string; png?: Png[]; v?: string;
+}) => (
+  <Card className={`p-4 bg-white/80 min-w-0 flex flex-col ${className || ""}`}>
     <h2 className="font-semibold text-neutral-800">{title}</h2>
     {note ? <p className="text-xs text-slate-500 mb-3">{note}</p> : <div className="mb-3" />}
-    {children}
+    <div className="flex-1">{children}</div>
+    {png?.length ? (
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        {png.map((p) => (
+          <a key={p.id} href={`/stats/${p.id}.png?v=${v}`} download={`${p.id}.png`}
+            title={`${p.title} — image PNG (matplotlib) de toutes les thèses, sans les filtres`}
+            className="inline-flex items-center gap-1 rounded-md border border-blue-600 px-2 py-0.5 text-xs text-blue-700 hover:bg-blue-50">
+            <Download className="h-3 w-3" /> PNG{png.length > 1 ? ` · ${p.label || p.title}` : ""}
+          </a>
+        ))}
+      </div>
+    ) : null}
   </Card>
 );
 
-const DashboardClient = ({ theses }: { theses: Rec[] }) => {
+const DashboardClient = ({ theses, pngs = {}, version = "" }: { theses: Rec[]; pngs?: Record<string, Png>; version?: string }) => {
+  // live chart → its matplotlib image(s), when build_charts.py drew one (stats.json)
+  const png = (...ids: string[]) => ({ png: ids.map((id) => pngs[id]).filter(Boolean), v: version });
   const [query, setQuery] = useState("");
   const [debounced] = useDebounce(query, 200);
   const [f, setF] = useState<Filters>(EMPTY);
@@ -169,13 +187,13 @@ const DashboardClient = ({ theses }: { theses: Rec[] }) => {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Section className="lg:col-span-2" title="Thèses par année, par option"
+        <Section className="lg:col-span-2" title="Thèses par année, par option" {...png("by-year")}
           note="Une thèse = une spécialité (classement final : barycentre jury de la page de garde, bibliothèque, titre). Clic sur une barre = filtrer l'année.">
           <YearBars years={years} stacks={charts.yearStacks} active={f.year} onPick={(y) => toggle("year", y)} tip={tipProps} />
           <Legend items={charts.yearStacks.map((s) => ({ label: s.label, color: s.color, value: Array.from(s.counts.values()).reduce((a, b) => a + b, 0) }))} />
         </Section>
 
-        <Section className="lg:col-span-2" title="Spécialités officielles, par option"
+        <Section className="lg:col-span-2" title="Spécialités officielles, par option" {...png("by-group", "by-specialty")}
           note="Liste officielle des 42 spécialités FMPM. Teinte = statut : foncé confirmée · moyen probable · clair à vérifier. Clic = filtrer la spécialité ; clic sur l'option = filtrer l'option.">
           <div className="grid gap-6 md:grid-cols-3">
             {GROUPS.map((g) => {
@@ -194,22 +212,22 @@ const DashboardClient = ({ theses }: { theses: Rec[] }) => {
           </div>
         </Section>
 
-        <Section className="lg:col-span-2" title="Carte spécialité × année"
+        <Section className="lg:col-span-2" title="Carte spécialité × année" {...png("specialty-heatmap")}
           note="Plus la case est foncée, plus il y a de thèses. Clic sur une case = spécialité + année ; sur un nom = la spécialité.">
           <Heatmap rows={charts.heat} years={years} cell={charts.heatCell} color={(k) => GROUP_COLOR[charts.groupOf.get(k) || ""] || OTHER_COLOR}
             tip={tipProps} onPick={(spe, y) => setF((o) => (y ? { ...o, spe, year: o.year === y && o.spe === spe ? null : y } : { ...o, spe: o.spe === spe ? null : spe }))} />
         </Section>
 
-        <Section title="Rapporteurs (top 15)" note="Jury lu dans le catalogue de la bibliothèque (lib.fmpm.uca.ma). Clic = filtrer.">
+        <Section title="Rapporteurs (top 15)" {...png("by-rapporteur")} note="Jury lu dans le catalogue de la bibliothèque (lib.fmpm.uca.ma). Clic = filtrer.">
           <HBars rows={charts.rapp} color="#6250d6" total={rows.length} active={f.rapp} onPick={(k) => toggle("rapp", k)} tip={tipProps} />
         </Section>
-        <Section title="Type d’étude" note="D’après le titre — indicatif. Une thèse peut compter dans plusieurs types. Clic = filtrer.">
+        <Section title="Type d’étude" {...png("study-design")} note="D’après le titre — indicatif. Une thèse peut compter dans plusieurs types. Clic = filtrer.">
           <HBars rows={charts.design} color="#6250d6" total={rows.length} active={f.design} onPick={(k) => toggle("design", k)} tip={tipProps} />
         </Section>
-        <Section title="Hôpitaux et villes cités" note="D’après le titre — indicatif. Clic = filtrer.">
+        <Section title="Hôpitaux et villes cités" {...png("cities")} note="D’après le titre — indicatif. Clic = filtrer.">
           <HBars rows={charts.place} color="#1baf7a" total={rows.length} active={f.place} onPick={(k) => toggle("place", k)} tip={tipProps} />
         </Section>
-        <Section title="Thèses en anglais, par année" note="Langue du catalogue, à défaut devinée sur le titre.">
+        <Section title="Thèses en anglais, par année" {...png("english-share")} note="Langue du catalogue, à défaut devinée sur le titre.">
           <YearBars years={years} stacks={[{ label: "en anglais", color: "#eda100", counts: charts.english }]} tip={tipProps} height={110} />
           <p className="text-xs text-slate-500 mt-1">{fmt(Array.from(charts.english.values()).reduce((a, b) => a + b, 0))} sur {fmt(rows.length)} thèses.</p>
         </Section>
