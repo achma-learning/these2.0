@@ -22,7 +22,7 @@ const SpecialitesSection = ({ counts, unclassified }: { counts: Record<string, n
         Liste officielle des spécialités de la FMPM (2024) : 42 spécialités en 3 options. Une thèse = une spécialité, la
         plus probable d&apos;après le jury de la page de garde, la catégorie de la bibliothèque et le titre
         {unclassified ? ` (${unclassified} thèse${unclassified > 1 ? "s" : ""} non classée${unclassified > 1 ? "s" : ""})` : ""}.{" "}
-        <Link href="/dashboard" className="underline">Voir les graphiques</Link>
+        <Link href="/stats" className="underline">Voir les graphiques</Link>
       </p>
     </div>
     <div className="grid gap-6 md:grid-cols-3">

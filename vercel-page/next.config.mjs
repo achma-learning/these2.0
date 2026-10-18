@@ -48,6 +48,10 @@ const nextConfig = {
     config.resolve.alias.encoding = false;
     return config;
   },
+  // /dashboard was renamed /stats (2026-10-18): old links and bookmarks, query string included, keep working
+  async redirects() {
+    return [{ source: "/dashboard", destination: "/stats", permanent: true }];
+  },
   async headers() {
     return [
       {

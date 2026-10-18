@@ -9,7 +9,7 @@ Find FMPM theses easily. This is the original These2.0 app with three additions:
    result shrinks, and leaves the file untouched when nothing changed (`json/status.json` records
    the check).
    Data went from 3,219 theses (June 2024) to 4,000+ (2006 → current year).
-2. **`/dashboard` page** with matplotlib charts (`scripts/build_charts.py` → `public/stats/`):
+2. **`/stats` page** (was `/dashboard`, redirected) with live charts + matplotlib PNG downloads (`scripts/build_charts.py` → `public/stats/`):
    theses per year, English share, the 3 official specialty groups, the 42 official specialties,
    specialty × year heatmap, study design, keywords, rapporteurs, most solicited professors, cities.
    **Official specialties:** `scripts/specialites.py` classifies every thesis into the FMPM list

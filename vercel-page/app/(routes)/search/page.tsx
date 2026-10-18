@@ -38,7 +38,7 @@ const page = async ({ searchParams }: Props) => {
         <p className="px-8 text-sm text-slate-700">
           Spécialité officielle FMPM : <span className="font-semibold">{spe}</span> ·{" "}
           <Link href="/categories" className="underline">autres spécialités</Link> ·{" "}
-          <Link href={`/dashboard?spe=${encodeURIComponent(spe)}`} className="underline">graphiques</Link>
+          <Link href={`/stats?spe=${encodeURIComponent(spe)}`} className="underline">graphiques</Link>
         </p>
       ) : null}
 

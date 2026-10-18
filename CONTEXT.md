@@ -1,5 +1,5 @@
 # These2.0 (FMPM theses) — AI Context File
-_Last synced: 2026-10-18 (branch `claude/eager-dirac-wiu2sc`: final FMPM classification (pass 0) ported to vercel-page)_
+_Last synced: 2026-10-18 (branch `claude/eager-dirac-wiu2sc`: `/dashboard` → `/stats`, PNG button per chart)_
 
 > **2026-10-17 restructure:** this repo is now **Vercel-only** (`vercel-page/`). The GitHub Pages site (`github-page/`) moved to `achma-learning/theses-maroc` under `these2/`; the full previous layout is on branch `old`. Sections below that mention `github-page/` / `pages.yml` describe branch `old`.
 
@@ -17,7 +17,7 @@ Two sub-projects, deliberately separate:
 - **Deploy:** automatic.
   - Every Monday at 04:17 UTC, `.github/workflows/update-data.yml` checks the sources. It redraws the charts and copies them only if the data changed; on quiet weeks it commits just `status.json`.
   - `.github/workflows/pages.yml` publishes `github-page/` (Pages source must be "GitHub Actions").
-  - Vercel: project Root Directory = `vercel-page`, redeploys on push. Live: <https://these2-0.vercel.app/> (ours), <https://thesefmpm.vercel.app/> (Akram's original), <https://achma-learning.github.io/these2.0/github-page/> (Pages).
+  - Vercel: project Root Directory = `vercel-page`, redeploys on push. Live: <https://thesefmpm3.vercel.app/search> (ours), <https://thesefmpm.vercel.app/> (Akram's original), <https://achma-learning.github.io/these2.0/github-page/> (Pages).
   - Manual run: Actions → Update data → Run workflow. Tick "redraw_charts" after editing `build_charts.py`.
 - **Required env vars:** none.
 
@@ -41,7 +41,7 @@ Two sub-projects, deliberately separate:
 - `github-page/index.html` + `assets/app.js`: search (client-side over `data/theses.json`, URL-synced filters, "?" chips for guessed specialties).
 - `github-page/assets/charts.js`: **interactive SVG charts**, drawn in the browser from the `table` of each chart in `stats.json` (no library). One renderer per chart id in `RENDER` (bars, stacked bars, heatmap, top-N lists); an id with no renderer falls back to its PNG. Hover tooltip, keyboard focus, click → `onPick`.
 - `github-page/dashboard.html` + `assets/dashboard.js`: fetches `stats.json`/`theses.json`/`status.json` with `cache: "no-cache"` on every visit, so charts update as soon as the Action commits new data (no PNG needed). A click on a mark (`applyPick`) filters the "Filtrage dynamique" table: year, group, specialty, city (title search), keyword (library tags), professor/rapporteur (same `prof_key` rule as `build_charts.py`). Bottom-right "⬇ PNG" button on each chart downloads the matplotlib PNG (dark one if the page is dark). Also CSV export and the "vérifié le" line.
-- `vercel-page/app/(routes)/dashboard/page.tsx`: same dashboard in Next (prerendered at build).
+- `vercel-page/app/(routes)/stats/page.tsx` (route `/stats`, was `/dashboard` — permanent redirect in `next.config.mjs`, query string kept): live charts (`components/dashboard/`, `lib/dashboard.ts`), prerendered at build; each chart has a « ⬇ PNG » button (bottom right) for its matplotlib image `public/stats/<id>.png` (mapping in `page.tsx`: `SHOWN`, `PNG_LABEL`); images with no live twin (`top-keywords`, `top-professors`) listed at the bottom.
 - `vercel-page/types.d.ts`: the `These` type. New fields: `specialite`, `groupe`, `specialiteSource`, `specialiteConfiance`.
 - `vercel-page/lib/renew-lib.ts` + `actions/renew-data.ts` + `app/api/renew-data`: the ORIGINAL TS scraper. Superseded; kept for the author.
 - `these2.0-v1-original.zip`: read-only backup of the original code (git archive of `29a96f5`).
@@ -74,6 +74,7 @@ Two sub-projects, deliberately separate:
 - **Skip on cleanup:** `vercel-page/json/file copy.json` (author's old snapshot). `vercel-page/.github/workflows/` is inert here on purpose: it's for the author's repo.
 
 ## 7. Current State
+- **Shipped 2026-10-18 (evening):** `/dashboard` renamed **`/stats`** (navbar « Stats », internal links updated, `/dashboard` → `/stats` 308 redirect keeps old links and `?spe=` filters). « ⬇ PNG » download button at the bottom right of each live chart (its matplotlib image, all theses, no filters; two buttons on « Spécialités » : options + spécialités). Note: the route `/stats` and the folder `public/stats/` (PNGs) coexist without conflict — checked with `next start`.
 - **Shipped 2026-10-18 (later):** `/dashboard` is now **live**: `app/(routes)/dashboard/page.tsx` (server, static) projects `json/file.json` into `lib/dashboard.ts: Rec` and `components/dashboard/dashboard-client.tsx` recomputes every chart in the browser on each search/click (theses per year by option, the 42 specialties per option shaded by status, specialty × year heatmap, top rapporteurs, study type, places, English titles, frequent words, result list → `/these/[id]`); filters synced to the URL (`?search=&year=&groupe=&spe=&rapporteur=&type=&lieu=`). Chart primitives in `components/dashboard/charts.tsx` (HTML/SVG + Tailwind, no library). matplotlib PNGs stay as downloads. Landmine: Next 14.1 patches `history.replaceState` → always pass `window.history.state`, never `null`. `/categories` starts with the **42 official specialties** by option with counts (`components/specialites-section.tsx`, list in `lib/specialites.ts`, data spelling) → `/search?spe=<slug>` (new `spe` filter: `getSearchParams`, `getTheses`); library categories below.
 - **Shipped 2026-10-18:** `vercel-page` now uses the **final FMPM classification** first (pass 0 of `scripts/specialites.py`, ported from theses-maroc): `json/theses-fmpm-specialites.csv` (copy of theses-maroc `archive/fmpm/`, built in achma-learning/these by `classer_fmpm.py`: two-step barycentre — option then specialty — of the cover-page jury, library category and title; 93/113 on an independent ground truth). Its `Statut` becomes `specialiteSource` (`confirmée` / `vérifiée` / `probable` / `à vérifier`); the old passes only cover theses the file doesn't have yet. Unclassified 197 → 2 (confirmée 3 532, probable 467, à vérifier 3). New `scripts/reclassify.py` (rerun the classification on `json/file.json` offline), `build_charts.py` maps statuses to its 3 columns (plein = confirmée, hachures = probable / à vérifier), `types.d.ts` widened. **After a new classification in achma-learning/these:** copy the CSV to `vercel-page/json/`, run `reclassify.py` then `build_charts.py`.
 - **Last shipped (2026-10-16):**

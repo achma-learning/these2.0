@@ -26,14 +26,14 @@ const Navbar = (props: Props) => {
                 Categories
               </p>
             </Link>
-            <Link href={"/dashboard"}>
+            <Link href={"/stats"}>
               <p
                 className={cn(
-                  pathname === "/dashboard" ? "font-semibold" : "font-light",
+                  pathname === "/stats" ? "font-semibold" : "font-light",
                   "text-white"
                 )}
               >
-                Dashboard
+                Stats
               </p>
             </Link>
             <Link href={"/search"}>

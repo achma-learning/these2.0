@@ -5,14 +5,19 @@ import { getLocalData } from "@/actions/load-data";
 import DashboardClient from "@/components/dashboard/dashboard-client";
 import { looksEnglish, Rec, statusOf } from "@/lib/dashboard";
 
+// /stats (was /dashboard, redirected in next.config.mjs).
 // Live charts: the theses are read here once (static page, rebuilt on each deploy) and every chart is
 // recomputed in the browser by DashboardClient on each search or click. The matplotlib PNGs drawn by
-// scripts/build_charts.py into public/stats/ stay available as downloads (listed in stats.json).
+// scripts/build_charts.py into public/stats/ are a « ⬇ PNG » button under their live chart (stats.json).
 type Chart = { id: string; section: string; title: string };
+// Button text when a live chart has two images
+const PNG_LABEL: Record<string, string> = { "by-group": "options", "by-specialty": "spécialités" };
+// Images with no live twin: listed at the bottom
+const SHOWN = new Set(["by-year", "by-group", "by-specialty", "specialty-heatmap", "by-rapporteur", "study-design", "cities", "english-share"]);
 type Stats = { version: string; charts: Chart[] };
 
 export const metadata: Metadata = {
-  title: "These2.0 | Dashboard",
+  title: "These2.0 | Stats",
   description: "Tableau de bord dynamique des thèses FMPM : années, spécialités officielles, rapporteurs, types d'étude, villes",
 };
 
@@ -61,18 +66,19 @@ const Page = async () => {
           officielle) et lib.fmpm.uca.ma (jury). Tous les graphiques suivent la recherche et les clics.
         </p>
       </div>
-      <DashboardClient theses={data.map(toRec)} />
+      <DashboardClient theses={data.map(toRec)} version={stats?.version || ""}
+        pngs={Object.fromEntries((stats?.charts || []).map((c) => [c.id, { id: c.id, title: c.title, label: PNG_LABEL[c.id] }]))} />
       <p className="text-sm text-slate-700">
         Spécialités et options suivent la liste officielle des spécialités de la FMPM (docs/liste-des-specialites-fmpm.pdf).
         Une thèse = une spécialité : la plus probable, d&apos;après le jury lu sur la page de garde (rapporteur surtout),
         la catégorie de la bibliothèque et le titre ; « ? » = pas confirmée. Type d&apos;étude, villes et langue devinée
         sont lus dans le titre : ce sont des estimations.
       </p>
-      {stats ? (
+      {stats?.charts.some((c) => !SHOWN.has(c.id)) ? (
         <details className="text-sm">
-          <summary className="cursor-pointer text-slate-700">Graphiques en image (PNG, matplotlib)</summary>
+          <summary className="cursor-pointer text-slate-700">Autres graphiques en image (PNG, matplotlib)</summary>
           <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-            {stats.charts.map((c) => (
+            {stats.charts.filter((c) => !SHOWN.has(c.id)).map((c) => (
               <li key={c.id}>
                 <a className="underline text-blue-700" href={`/stats/${c.id}.png?v=${stats.version}`} target="_blank" rel="noopener noreferrer">
                   {c.title}
