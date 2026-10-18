@@ -39,6 +39,7 @@ type searchParams = {
   page?: number;
   sortBy?: string;
   categ?: string;
+  spe?: string; // official FMPM specialty, slug (lib/specialites.ts)
   lang?: string;
   year?: number;
 };

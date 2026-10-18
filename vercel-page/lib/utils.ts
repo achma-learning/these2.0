@@ -2,6 +2,7 @@ import { getAllCategories } from "@/actions/get-all-categories";
 import { imagePerCategory } from "@/lib/constants";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { speFromSlug } from "@/lib/specialites";
 
 // cn to merge classnames
 export const cn = (...inputs: ClassValue[]) => {
@@ -134,7 +135,8 @@ export const getSearchParams = async (searchParams: searchParams) => {
     | "eng"
     | undefined;
   const year = isPartOfNumberRange(Number(searchParams?.year));
-  
-  return { search, categ, lang, year, sort, page };
+  const spe = speFromSlug(searchParams?.spe);
+
+  return { search, categ, spe, lang, year, sort, page };
 };
 
