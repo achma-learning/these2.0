@@ -2,7 +2,7 @@
 
 Search engine + dashboard for the theses of the Faculté de Médecine et de Pharmacie de Marrakech
 (FMPM). The official catalogue <https://wd.fmpm.uca.ma/biblio/theses/Accueil.html> is checked
-every week; data and matplotlib charts are regenerated only when it changed. Jury details come from
+every day; data and matplotlib charts are regenerated only when it changed. Jury details come from
 the library catalogue (lib.fmpm.uca.ma); every thesis is classified into the official FMPM specialty
 list (`vercel-page/docs/liste-des-specialites-fmpm.pdf`).
 
@@ -19,7 +19,7 @@ full previous structure of this repo is kept on the [`old`](https://github.com/a
 
 `vercel-page/` is the Next.js app (Vercel root directory = `vercel-page`). `these2.0-v1-original.zip` is a read-only backup of the original code.
 
-Weekly check (Monday 04:17 UTC): `.github/workflows/update-data.yml` runs `vercel-page/scripts/update_theses.py`.
+Daily check (04:17 UTC): `.github/workflows/update-data.yml` runs `vercel-page/scripts/update_theses.py`.
 If the data changed it also redraws the charts and commits (Vercel redeploys); otherwise only `status.json` is committed.
 Run it by hand from Actions → Update data → Run workflow.
 

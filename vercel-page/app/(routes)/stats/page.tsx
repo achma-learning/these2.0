@@ -30,7 +30,7 @@ const getStats = async (): Promise<Stats | null> => {
   }
 };
 
-// json/status.json is rewritten by the weekly check (scripts/update_theses.py), even when nothing changed
+// json/status.json: rewritten by the daily check (scripts/update_theses.py), committed when the data changed and on Mondays
 const getCheckedAt = async (): Promise<string | null> => {
   try {
     const file = path.join(process.cwd(), "json/status.json");
@@ -62,7 +62,7 @@ const Page = async () => {
         <h1 className="font-semibold text-3xl text-neutral-800">Tableau de bord des thèses FMPM</h1>
         <p className="text-slate-700 mt-1">
           {data.length} thèses · données du {String(lastFetched)}
-          {checkedAt ? ` · vérifié le ${checkedAt} (contrôle hebdomadaire)` : ""} · sources : wd.fmpm.uca.ma (liste
+          {checkedAt ? ` · site officiel contrôlé chaque jour (dernier relevé enregistré : ${checkedAt})` : ""} · sources : wd.fmpm.uca.ma (liste
           officielle) et lib.fmpm.uca.ma (jury). Tous les graphiques suivent la recherche et les clics.
         </p>
       </div>
