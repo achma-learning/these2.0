@@ -2,7 +2,7 @@
 
 Find FMPM theses easily. This is the original These2.0 app with three additions:
 
-1. **Fresh data, checked every week.** `scripts/update_theses.py` re-reads the official catalogue
+1. **Fresh data, checked every day.** `scripts/update_theses.py` re-reads the official catalogue
    (<https://wd.fmpm.uca.ma/biblio/theses/annee-htm/YEAR.htm>) and fills jury / specialty /
    keywords from the library OPAC (lib.fmpm.uca.ma), then rewrites `json/file.json` in the same
    format as before (plus optional fields). Existing records are kept; it refuses to write if the
@@ -16,7 +16,7 @@ Find FMPM theses easily. This is the original These2.0 app with three additions:
    (`docs/liste-des-specialites-fmpm.pdf`): library category first, then the rapporteur's other
    theses, then the title (Naive Bayes, only when ≥ 90 % sure). Fields: `specialite`, `groupe`,
    `specialiteSource`, `specialiteConfiance`. The library's own `category` is left untouched.
-3. **A GitHub Action** (`.github/workflows/update-data.yml`) that checks the sources every Monday
+3. **A GitHub Action** (`.github/workflows/update-data.yml`) that checks the sources every day
    and redraws the charts only when the data changed. Vercel redeploys on the push. This replaces `/api/renew-data`, which cannot work on
    Vercel because the deployed file system is read-only.
 
